@@ -1,3 +1,7 @@
+import numpy as np
+import PIL
+print('Pillow Version:', PIL.__version__)
+
 def sign(x):
     if x>0:
         return 1

@@ -1,6 +1,27 @@
 import numpy as np
-import PIL
-print('Pillow Version:', PIL.__version__)
+import matplotlib.pyplot as plt
+from PIL import Image
+
+
+worksize = 8
+numpoints = 8
+
+rimpointsx = np.sin(np.linspace(0,2*np.pi,num=numpoints,endpoint = False))
+rimpointsy = np.cos(np.linspace(0,2*np.pi,num=numpoints,endpoint = False))
+
+rimpoints = np.round((worksize/2)*np.array((rimpointsx,rimpointsy)).T) + (worksize/2,worksize/2)
+print(rimpoints)
+
+# Preprocessing of the image
+image = Image.open(r"C:\Users\bskau\github\LineDraw\Lenna.png")
+
+
+newimage = image.convert('LA').resize((worksize,worksize))
+newimage.save(r"C:\Users\bskau\github\LineDraw\LennaBW.png")
+
+pixels = np.asarray(newimage)[:,:,0]#.reshape(8,8)
+
+
 
 def sign(x):
     if x>0:
@@ -29,5 +50,6 @@ def discrete_line(p1,p2):
     return cells
 
 
-
-print(discrete_line((0,0),(-5,-9)))
+l = discrete_line((2,2),(6,6))
+print(l)
+print(pixels[[(1,1),(2,2)]])

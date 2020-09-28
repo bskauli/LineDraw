@@ -10,7 +10,7 @@ rimpointsx = np.sin(np.linspace(0,2*np.pi,num=numpoints,endpoint = False))
 rimpointsy = np.cos(np.linspace(0,2*np.pi,num=numpoints,endpoint = False))
 
 rimpoints = np.round((worksize/2)*np.array((rimpointsx,rimpointsy)).T) + (worksize/2,worksize/2)
-print(rimpoints)
+
 
 # Preprocessing of the image
 image = Image.open(r"C:\Users\bskau\github\LineDraw\Lenna.png")
@@ -34,22 +34,13 @@ def sign(x):
 
 def discrete_line(p1,p2):
     """Given two points in a grid, returns a list of all grid cells meeting the line between the points"""
-    xdiff = p2[0] - p1[0]
-    ydiff = p2[1] - p1[1]
-    xincrement = sign(xdiff)
-    yincrement = sign(ydiff)
 
-    i,j = (1,1)
-    cells = [(i,j)]
-    while abs(i)<abs(xdiff) or abs(j) < abs(ydiff):
-        if abs(i*ydiff) <= abs(j*xdiff):
-            i += xincrement
-        else:
-            j += yincrement
-        cells.append((i,j))
-    return cells
+    numpixels = abs(p2[0] - p1[0]) + abs(p2[1] - p1[1]) #Taxicap metric distance
 
+    xline = np.round(np.linspace(p1[0],p2[0],numpixels))
+    yline = np.round(np.linspace(p1[1],p2[1],numpixels))
 
-l = discrete_line((2,2),(6,6))
+    return np.array([xline,yline]).T
+
+l = discrete_line((0,0),(5,-3))
 print(l)
-print(pixels[[(1,1),(2,2)]])

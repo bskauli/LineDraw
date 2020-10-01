@@ -1,10 +1,10 @@
 import numpy as np
 import matplotlib.pyplot as plt
-from PIL import Image
+from PIL import Image,ImageFilter
 import itertools
 
-worksize = 8
-numpoints = 8
+worksize = 128
+numpoints = 512
 
 rimpointsx = np.sin(np.linspace(0,2*np.pi,num=numpoints,endpoint = False)) + 1
 rimpointsy = np.cos(np.linspace(0,2*np.pi,num=numpoints,endpoint = False)) + 1
@@ -15,13 +15,13 @@ rimpoints = rimpoints.astype(int)
 # Preprocessing of the image
 image = Image.open(r"C:\Users\bskau\github\LineDraw\Lenna.png")
 
-
-newimage = image.convert('LA').resize((worksize,worksize))
+image = image.filter(ImageFilter.FIND_EDGES)
+newimage = image.convert('LA').resize((worksize+2,worksize+2))
 newimage.save(r"C:\Users\bskau\github\LineDraw\LennaBW.png")
 
-pixels = np.asarray(newimage)[:,:,0]#.reshape(8,8)
+pixels = np.asarray(newimage)[1:-1,1:-1,0]#.reshape(8,8)
 
-
+pixels = pixels*(-1)+255
 
 def sign(x):
     if x>0:
@@ -56,9 +56,23 @@ def lineweight(endpoints):
     l = discrete_line(endpoints[0],endpoints[1])
     return np.sum(pixels[l[:,0],l[:,1]])/len(l)
 
-weights = np.array(list(map(lineweight,lines)))
-lowestline = lines[np.argmin(weights)]
 
 
-print(discrete_line((0,0),(0,7)))
-print(np.linspace(0,7,8))
+weights = list(map(lineweight,lines))
+
+weightendslines = list(map((lambda e : (lineweight(e),e,discrete_line(e[0],e[1]))),lines))
+print(weightendslines)
+
+weightendslines.sort(key = lambda e : e[0])
+
+cutoff = 2000
+outpixels = np.zeros((worksize,worksize)) + 255
+
+for i in range(0,cutoff):
+    currentline = weightendslines[i][2]
+    outpixels[currentline[:,0],currentline[:,1]] = 0
+
+print(outpixels)
+outimage = Image.fromarray(outpixels)
+outimage.show()
+outimage.save(r"C:\Users\bskau\github\LineDraw\LennaLine.png")

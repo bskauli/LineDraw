@@ -36,11 +36,9 @@ def discrete_line(p1,p2):
 
     """
     Given two points in a grid, returns a list of all grid cells meeting the line between the points
-
-    Current implementation is imperfect, as it skips a point on at least horizontal&vertical lines
     """
 
-    numpixels = abs(p2[0] - p1[0]) + abs(p2[1] - p1[1]) #Taxicap metric distance
+    numpixels = abs(p2[0] - p1[0]) + abs(p2[1] - p1[1]) + 1 #Taxicap metric distance
 
     xline = np.rint(np.linspace(p1[0],p2[0],numpixels)).astype(int)
     yline = np.rint(np.linspace(p1[1],p2[1],numpixels)).astype(int)
@@ -60,8 +58,7 @@ def lineweight(endpoints):
 
 weights = np.array(list(map(lineweight,lines)))
 lowestline = lines[np.argmin(weights)]
-print(np.min(weights))
-print(lowestline)
 
-print(pixels)
-print(pixels[lowestline[0][0],lowestline[0][1]])
+
+print(discrete_line((0,0),(0,7)))
+print(np.linspace(0,7,8))

@@ -3,8 +3,8 @@ import matplotlib.pyplot as plt
 from PIL import Image,ImageFilter
 import itertools
 
-worksize = 128
-numpoints = 512
+worksize = 512
+numpoints = 100
 
 rimpointsx = np.sin(np.linspace(0,2*np.pi,num=numpoints,endpoint = False)) + 1
 rimpointsy = np.cos(np.linspace(0,2*np.pi,num=numpoints,endpoint = False)) + 1
@@ -51,28 +51,27 @@ lines = []
 for line in itertools.combinations(rimpoints,2):
     lines.append(line)
 
-def lineweight(endpoints):
-    """Return the weight assigned to the line between the two points"""
+def lineloss(endpoints):
+    """Return the loss assigned to the line between the two points"""
     l = discrete_line(endpoints[0],endpoints[1])
-    return np.sum(pixels[l[:,0],l[:,1]])/len(l)
+    lpoints = pixels[l[:,0],l[:,1]]
+    return np.sum(lpoints**2)/len(l)
 
 
 
-weights = list(map(lineweight,lines))
+losses = list(map(lineloss,lines))
 
-weightendslines = list(map((lambda e : (lineweight(e),e,discrete_line(e[0],e[1]))),lines))
-print(weightendslines)
+lossendslines = list(map((lambda e : (lineloss(e),e,discrete_line(e[0],e[1]))),lines))
 
-weightendslines.sort(key = lambda e : e[0])
+lossendslines.sort(key = lambda e : e[0])
 
-cutoff = 2000
+cutoff = 300
 outpixels = np.zeros((worksize,worksize)) + 255
 
 for i in range(0,cutoff):
-    currentline = weightendslines[i][2]
+    currentline = lossendslines[i][2]
     outpixels[currentline[:,0],currentline[:,1]] = 0
 
-print(outpixels)
 outimage = Image.fromarray(outpixels)
 outimage.show()
-outimage.save(r"C:\Users\bskau\github\LineDraw\LennaLine.png")
+#outimage.save(r"C:\Users\bskau\github\LineDraw\LennaLine.png")

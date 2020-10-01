@@ -4,7 +4,7 @@ from PIL import Image,ImageFilter
 import itertools
 
 worksize = 512
-numpoints = 100
+numpoints = 512
 
 rimpointsx = np.sin(np.linspace(0,2*np.pi,num=numpoints,endpoint = False)) + 1
 rimpointsy = np.cos(np.linspace(0,2*np.pi,num=numpoints,endpoint = False)) + 1
@@ -13,7 +13,7 @@ rimpoints = np.round((((worksize-1)/2))*np.array((rimpointsx,rimpointsy)).T)
 rimpoints = rimpoints.astype(int)
 
 # Preprocessing of the image
-image = Image.open(r"C:\Users\bskau\github\LineDraw\Lenna.png")
+image = Image.open(r"C:\Users\bskau\github\LineDraw\circle.png")
 
 image = image.filter(ImageFilter.FIND_EDGES)
 newimage = image.convert('LA').resize((worksize+2,worksize+2))
@@ -65,7 +65,7 @@ lossendslines = list(map((lambda e : (lineloss(e),e,discrete_line(e[0],e[1]))),l
 
 lossendslines.sort(key = lambda e : e[0])
 
-cutoff = 300
+cutoff = 1000
 outpixels = np.zeros((worksize,worksize)) + 255
 
 for i in range(0,cutoff):

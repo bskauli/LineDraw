@@ -1,10 +1,13 @@
 import numpy as np
 import matplotlib.pyplot as plt
-from PIL import Image,ImageFilter
+from PIL import Image
+from scipy import ndimage,misc
+import matplotlib.pyplot as plt
+import sys
 import itertools
 
-worksize = 2048
-numpoints = 512
+worksize = 512
+numpoints = 128
 
 rimpointsx = np.sin(np.linspace(0,2*np.pi,num=numpoints,endpoint = False)) + 1
 rimpointsy = np.cos(np.linspace(0,2*np.pi,num=numpoints,endpoint = False)) + 1
@@ -15,13 +18,34 @@ rimpoints = rimpoints.astype(int)
 # Preprocessing of the image
 image = Image.open(r"C:\Users\bskau\github\LineDraw\Lenna.png")
 
-image = image.filter(ImageFilter.FIND_EDGES).filter(ImageFilter.GaussianBlur(radius = 5))
-newimage = image.convert('LA').resize((worksize+2,worksize+2))
-newimage.save(r"C:\Users\bskau\github\LineDraw\LennaBW.png")
+#image = image.filter(ImageFilter.FIND_EDGES).filter(ImageFilter.GaussianBlur(radius = 5))
+#newimage = image.convert('LA').resize((worksize+2,worksize+2))
+#newimage.save(r"C:\Users\bskau\github\LineDraw\LennaBW.png")
 
-pixels = np.asarray(newimage)[1:-1,1:-1,0]#.reshape(8,8)
 
-pixels = pixels*(-1)+255
+newimage = image.resize((worksize,worksize)).convert('LA')
+pixels = np.asarray(newimage)[:,:,0]
+
+
+
+horgradient = ndimage.sobel(pixels, axis = 1)
+vergradient = ndimage.sobel(pixels, axis = 0)
+
+horgradient = ndimage.gaussian_filter(horgradient,sigma = 5)
+vergradient = ndimage.gaussian_filter(vergradient,sigma = 5)
+
+fig = plt.figure()
+plt.gray()  # show the filtered result in grayscale
+ax1 = fig.add_subplot(121)  # left side
+ax2 = fig.add_subplot(122)  # right side
+
+
+ax1.imshow(horgradient)
+ax2.imshow(vergradient)
+plt.show()
+
+gradient = np.swapaxes(np.swapaxes(np.array([horgradient,vergradient]),0,1),1,2) #Transposing to correct shape
+
 
 def sign(x):
     if x>0:
@@ -54,8 +78,9 @@ for line in itertools.combinations(rimpoints,2):
 def lineloss(endpoints):
     """Return the loss assigned to the line between the two points"""
     l = discrete_line(endpoints[0],endpoints[1])
-    lpoints = pixels[l[:,0],l[:,1]]
-    return np.sum(lpoints**2)/len(l)
+    direction = endpoints[1]-endpoints[0]
+    lpoints = gradient[l[:,0],l[:,1]]
+    return np.sum(np.dot(lpoints,direction)**2)/len(l)
 
 
 
@@ -65,13 +90,14 @@ lossendslines = list(map((lambda e : (lineloss(e),e,discrete_line(e[0],e[1]))),l
 
 lossendslines.sort(key = lambda e : e[0])
 
-cutoff = 10000
+cutoff = 1000
 outpixels = np.zeros((worksize,worksize)) + 255
-
 for i in range(0,cutoff):
     currentline = lossendslines[i][2]
     outpixels[currentline[:,0],currentline[:,1]] = 0
 
 outimage = Image.fromarray(outpixels)
 outimage.show()
+
+
 #outimage.save(r"C:\Users\bskau\github\LineDraw\LennaLine.png")

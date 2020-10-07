@@ -7,7 +7,7 @@ import sys
 import itertools
 
 worksize = 512
-numpoints = 128
+numpoints = 64
 
 rimpointsx = np.sin(np.linspace(0,2*np.pi,num=numpoints,endpoint = False)) + 1
 rimpointsy = np.cos(np.linspace(0,2*np.pi,num=numpoints,endpoint = False)) + 1
@@ -16,7 +16,7 @@ rimpoints = np.round((((worksize-1)/2))*np.array((rimpointsx,rimpointsy)).T)
 rimpoints = rimpoints.astype(int)
 
 # Preprocessing of the image
-image = Image.open(r"C:\Users\bskau\github\LineDraw\Lenna.png")
+image = Image.open(r"C:\Users\bskau\github\LineDraw\VertLine.png")
 
 #image = image.filter(ImageFilter.FIND_EDGES).filter(ImageFilter.GaussianBlur(radius = 5))
 #newimage = image.convert('LA').resize((worksize+2,worksize+2))
@@ -24,15 +24,21 @@ image = Image.open(r"C:\Users\bskau\github\LineDraw\Lenna.png")
 
 
 newimage = image.resize((worksize,worksize)).convert('LA')
-pixels = np.asarray(newimage)[:,:,0]
+pixels = np.asarray(newimage,dtype = np.float32)[:,:,0]
+print(pixels.dtype)
 
 
+horgradient = np.abs(ndimage.sobel(pixels, axis = 1))
+#horgradient = 255*horgradient/np.max(horgradient)
 
-horgradient = ndimage.sobel(pixels, axis = 1)
-vergradient = ndimage.sobel(pixels, axis = 0)
-
-horgradient = ndimage.gaussian_filter(horgradient,sigma = 5)
-vergradient = ndimage.gaussian_filter(vergradient,sigma = 5)
+vergradient = np.abs(ndimage.sobel(pixels, axis = 0))
+#vergradient = 255*vergradient/np.max(vergradient)
+#horgradient = ndimage.convolve(pixels,np.array([[-1,-1,-1],[-1,-1,-1],[-1,-1,-1]]))#,np.array([[-1,0,1],[-2,0,2],[-1,0,1]]))
+print(pixels)
+print(horgradient)
+print(vergradient)
+#horgradient = ndimage.gaussian_filter(horgradient,sigma = 5)
+#vergradient = ndimage.gaussian_filter(vergradient,sigma = 5)
 
 fig = plt.figure()
 plt.gray()  # show the filtered result in grayscale
@@ -44,7 +50,7 @@ ax1.imshow(horgradient)
 ax2.imshow(vergradient)
 plt.show()
 
-gradient = np.swapaxes(np.swapaxes(np.array([horgradient,vergradient]),0,1),1,2) #Transposing to correct shape
+gradient = np.swapaxes(np.swapaxes(np.array([vergradient,horgradient]),0,1),1,2) #Transposing to correct shape
 
 
 def sign(x):
@@ -80,7 +86,7 @@ def lineloss(endpoints):
     l = discrete_line(endpoints[0],endpoints[1])
     direction = endpoints[1]-endpoints[0]
     lpoints = gradient[l[:,0],l[:,1]]
-    return np.sum(np.dot(lpoints,direction)**2)/len(l)
+    return -np.sum(np.abs(np.dot(lpoints,direction)**2))/len(l)
 
 
 
@@ -95,9 +101,16 @@ outpixels = np.zeros((worksize,worksize)) + 255
 for i in range(0,cutoff):
     currentline = lossendslines[i][2]
     outpixels[currentline[:,0],currentline[:,1]] = 0
+    if i > 0 and i % 50 == 0:
+        print(i)
+        command = input()
+        if command == "exit":
+            break
+        outimage = Image.fromarray(outpixels)
+        outimage.show()
 
-outimage = Image.fromarray(outpixels)
-outimage.show()
+
+
 
 
 #outimage.save(r"C:\Users\bskau\github\LineDraw\LennaLine.png")

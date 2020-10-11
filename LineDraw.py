@@ -6,8 +6,8 @@ import matplotlib.pyplot as plt
 import sys
 import itertools
 
-worksize = 512
-numpoints = 64
+worksize = 16
+numpoints = 8
 
 rimpointsx = np.sin(np.linspace(0,2*np.pi,num=numpoints,endpoint = False)) + 1
 rimpointsy = np.cos(np.linspace(0,2*np.pi,num=numpoints,endpoint = False)) + 1
@@ -16,7 +16,7 @@ rimpoints = np.round((((worksize-1)/2))*np.array((rimpointsx,rimpointsy)).T)
 rimpoints = rimpoints.astype(int)
 
 # Preprocessing of the image
-image = Image.open(r"C:\Users\bskau\github\LineDraw\VertLine.png")
+image = Image.open(r"C:\Users\bskau\github\LineDraw\Star.png")
 
 #image = image.filter(ImageFilter.FIND_EDGES).filter(ImageFilter.GaussianBlur(radius = 5))
 #newimage = image.convert('LA').resize((worksize+2,worksize+2))
@@ -28,15 +28,13 @@ pixels = np.asarray(newimage,dtype = np.float32)[:,:,0]
 print(pixels.dtype)
 
 
-horgradient = np.abs(ndimage.sobel(pixels, axis = 1))
+horgradient = ndimage.sobel(pixels, axis = 1)
 #horgradient = 255*horgradient/np.max(horgradient)
 
-vergradient = np.abs(ndimage.sobel(pixels, axis = 0))
+vergradient = ndimage.sobel(pixels, axis = 0)
 #vergradient = 255*vergradient/np.max(vergradient)
 #horgradient = ndimage.convolve(pixels,np.array([[-1,-1,-1],[-1,-1,-1],[-1,-1,-1]]))#,np.array([[-1,0,1],[-2,0,2],[-1,0,1]]))
-print(pixels)
-print(horgradient)
-print(vergradient)
+
 #horgradient = ndimage.gaussian_filter(horgradient,sigma = 5)
 #vergradient = ndimage.gaussian_filter(vergradient,sigma = 5)
 
@@ -51,7 +49,8 @@ ax2.imshow(vergradient)
 plt.show()
 
 gradient = np.swapaxes(np.swapaxes(np.array([vergradient,horgradient]),0,1),1,2) #Transposing to correct shape
-
+plt.quiver(range(0,worksize),range(0,worksize),gradient[:,:,1],gradient[:,:,0])
+plt.show()
 
 def sign(x):
     if x>0:
@@ -86,7 +85,7 @@ def lineloss(endpoints):
     l = discrete_line(endpoints[0],endpoints[1])
     direction = endpoints[1]-endpoints[0]
     lpoints = gradient[l[:,0],l[:,1]]
-    return -np.sum(np.abs(np.dot(lpoints,direction)**2))/len(l)
+    return np.sum(np.abs(np.dot(lpoints,direction)**2))/len(l)
 
 
 
@@ -94,7 +93,15 @@ losses = list(map(lineloss,lines))
 
 lossendslines = list(map((lambda e : (lineloss(e),e,discrete_line(e[0],e[1]))),lines))
 
+l1 = lossendslines[1]
+print(l1[0])
+print(l1[1])
+print(l1[2])
+print(gradient.shape)
+print(np.sum(gradient[l1[2][:,0],l1[2][:,1]]))
+sys.exit()
 lossendslines.sort(key = lambda e : e[0])
+
 
 cutoff = 1000
 outpixels = np.zeros((worksize,worksize)) + 255

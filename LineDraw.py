@@ -6,8 +6,8 @@ import matplotlib.pyplot as plt
 import sys
 import itertools
 
-worksize = 16
-numpoints = 8
+worksize = 512
+numpoints = 128
 
 rimpointsx = np.sin(np.linspace(0,2*np.pi,num=numpoints,endpoint = False)) + 1
 rimpointsy = np.cos(np.linspace(0,2*np.pi,num=numpoints,endpoint = False)) + 1
@@ -16,7 +16,7 @@ rimpoints = np.round((((worksize-1)/2))*np.array((rimpointsx,rimpointsy)).T)
 rimpoints = rimpoints.astype(int)
 
 # Preprocessing of the image
-image = Image.open(r"C:\Users\bskau\github\LineDraw\Star.png")
+image = Image.open(r"C:\Users\bskau\github\LineDraw\Cross.png")
 
 #image = image.filter(ImageFilter.FIND_EDGES).filter(ImageFilter.GaussianBlur(radius = 5))
 #newimage = image.convert('LA').resize((worksize+2,worksize+2))
@@ -46,11 +46,11 @@ ax2 = fig.add_subplot(122)  # right side
 
 ax1.imshow(horgradient)
 ax2.imshow(vergradient)
-plt.show()
+#plt.show()
 
 gradient = np.swapaxes(np.swapaxes(np.array([vergradient,horgradient]),0,1),1,2) #Transposing to correct shape
 plt.quiver(range(0,worksize),range(0,worksize),gradient[:,:,1],gradient[:,:,0])
-plt.show()
+#plt.show()
 
 def sign(x):
     if x>0:
@@ -79,42 +79,66 @@ l = discrete_line((0,0),(5,3))
 lines = []
 for line in itertools.combinations(rimpoints,2):
     lines.append(line)
-
+lines = np.array(lines)
 def lineloss(endpoints):
     """Return the loss assigned to the line between the two points"""
     l = discrete_line(endpoints[0],endpoints[1])
     direction = endpoints[1]-endpoints[0]
+    dperp = np.array((-direction[1],direction[0])) #Perpendicular vector to the direction
     lpoints = gradient[l[:,0],l[:,1]]
-    return np.sum(np.abs(np.dot(lpoints,direction)**2))/len(l)
+
+    return -np.sum(np.abs(np.dot(lpoints,dperp)))
 
 
 
-losses = list(map(lineloss,lines))
+losses = np.array(list(map(lineloss,lines)))
 
-lossendslines = list(map((lambda e : (lineloss(e),e,discrete_line(e[0],e[1]))),lines))
-
-l1 = lossendslines[1]
-print(l1[0])
-print(l1[1])
-print(l1[2])
-print(gradient.shape)
-print(np.sum(gradient[l1[2][:,0],l1[2][:,1]]))
-sys.exit()
-lossendslines.sort(key = lambda e : e[0])
+#lossendslines = list(map((lambda e : (lineloss(e),e,discrete_line(e[0],e[1]))),lines))
 
 
-cutoff = 1000
+d = np.array([0,-15])
+
+
+#l1 = lossendslines[1]
+#print(l1[0])
+#print(l1[1])
+#print(l1[2])
+#print(gradient.shape)
+#print(np.sum(gradient[l1[2][:,0],l1[2][:,1]]))
+#sys.exit()
+#lossendslines.sort(key = lambda e : e[0])
+
+
+cutoff = 100
+
+threshold = np.min(losses)/10
+#print(losses<np.min(losses)/2)
+#print(np.min(losses))
+#print(lines.shape)
+drawlines = lines[losses <= threshold]
+
+
+
 outpixels = np.zeros((worksize,worksize)) + 255
-for i in range(0,cutoff):
-    currentline = lossendslines[i][2]
+print(outpixels)
+for i in range(0,len(drawlines)):
+    currentline = discrete_line(drawlines[i][0],drawlines[i][1])
     outpixels[currentline[:,0],currentline[:,1]] = 0
-    if i > 0 and i % 50 == 0:
-        print(i)
-        command = input()
-        if command == "exit":
-            break
-        outimage = Image.fromarray(outpixels)
-        outimage.show()
+
+
+
+# for i in range(0,cutoff):
+#     currentline = lossendslines[i][2]
+#     outpixels[currentline[:,0],currentline[:,1]] = 0
+#     # if i > 0 and i % 50 == 0:
+#     #     print(i)
+#     #     command = input()
+#     #     if command == "exit":
+    #         break
+
+
+outimage = Image.fromarray(outpixels)
+outimage.show()
 
 
 

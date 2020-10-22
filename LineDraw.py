@@ -6,67 +6,58 @@ import matplotlib.pyplot as plt
 import sys
 import itertools
 
-worksize =32
-numpoints = 32
+worksize =512
+numpoints = 128
 
-rimpointsx = np.sin(np.linspace(0,2*np.pi,num=numpoints,endpoint = False)) + 1
-rimpointsy = np.cos(np.linspace(0,2*np.pi,num=numpoints,endpoint = False)) + 1
+def perimeter_points(d,n,type = 'int'):
+    """Returns n points evenly spaced along the perimeter of a circle of diameter d centered at the origin,
+       if type = 'int' the coordinates are rounded to the neares integer"""
+    rimpointsx = np.sin(np.linspace(0,2*np.pi,num=n,endpoint = False)) + 1
+    rimpointsy = np.cos(np.linspace(0,2*np.pi,num=n,endpoint = False)) + 1
+    rimpoints = (((d-1)/2))*np.array([rimpointsy,rimpointsx])
+    if type == 'int':
+        rimpoints = np.round(rimpoints)
+        rimpoints = rimpoints.astype(int)
+    return rimpoints
 
-rimpoints = np.round((((worksize-1)/2))*np.array((rimpointsx,rimpointsy)).T)
-rimpoints = rimpoints.astype(int)
+print(perimeter_points(8,4))
+
 
 # Preprocessing of the image
-image = Image.open(r"C:\Users\bskau\github\LineDraw\Circle.png")
+def get_image(filepath,size):
+    """returns the image specified as a numpy array in grayscale
+    Images cropped to squares
+    """
+    image = Image.open(filepath)
+    newimage = image.resize((size,size)).convert('LA')
+    pixels = np.asarray(newimage,dtype = np.float32)[:,:,0]
+    return  pixels
 
-#image = image.filter(ImageFilter.FIND_EDGES).filter(ImageFilter.GaussianBlur(radius = 5))
-#newimage = image.convert('LA').resize((worksize+2,worksize+2))
-#newimage.save(r"C:\Users\bskau\github\LineDraw\LennaBW.png")
+def get_gradient(pixels,processing = 'normalize'):
+    """returns the gradient of an image, and does basic preprocessing"""
+    horgradient = ndimage.sobel(pixels, axis = 1)
+    vergradient = ndimage.sobel(pixels, axis = 0)
+    return np.array((horgradient,vergradient))
+
+    if processing == 'normalize':
+        """Normalizing the  gradient"""
+        gradnorm = 0.2*np.max(np.linalg.norm(gradient,axis = -1))
+        gradient = gradient / gradnorm
 
 
-newimage = image.resize((worksize,worksize)).convert('LA')
-pixels = np.asarray(newimage,dtype = np.float32)[:,:,0]
-
-
-horgradient = ndimage.sobel(pixels, axis = 1)
-#horgradient = 255*horgradient/np.max(horgradient)
-
-vergradient = ndimage.sobel(pixels, axis = 0)
-#vergradient = 255*vergradient/np.max(vergradient)
-#horgradient = ndimage.convolve(pixels,np.array([[-1,-1,-1],[-1,-1,-1],[-1,-1,-1]]))#,np.array([[-1,0,1],[-2,0,2],[-1,0,1]]))
-
-#horgradient = ndimage.gaussian_filter(horgradient,sigma = 5)
-#vergradient = ndimage.gaussian_filter(vergradient,sigma = 5)
-
-"""Making an array of coordinates, used to update the gradients after picking the best line"""
-
-xcoordinates = np.zeros((worksize,worksize))
-xcoordinates = xcoordinates + np.arange(0,worksize)
-
-ycoordinates = xcoordinates.T
-
-coordinates = np.swapaxes(np.swapaxes(np.array([ycoordinates,xcoordinates]),0,1),1,2)
+def coordinate_matrix(n):
+    """Making an array of coordinates"""
+    xcoordinates = np.zeros((n,n))
+    xcoordinates = xcoordinates + np.arange(0,worksize) #broadcasting trick
+    ycoordinates = xcoordinates.T
+    coordinates = np.array([ycoordinates,xcoordinates])
 
 
 
-fig = plt.figure()
-plt.gray()  # show the filtered result in grayscale
-ax1 = fig.add_subplot(121)  # left side
-ax2 = fig.add_subplot(122)  # right side
 
 
-ax1.imshow(horgradient)
-ax2.imshow(vergradient)
-#plt.show()
-
-gradient = np.swapaxes(np.swapaxes(np.array([vergradient,horgradient]),0,1),1,2) #Transposing to correct shape
-#plt.quiver(range(0,worksize),range(0,worksize),gradient[:,:,1],gradient[:,:,0])
-#plt.show()
-
-"""Normalizing the  gradient"""
-gradnorm = 0.2*np.max(np.linalg.norm(gradient,axis = -1))
 
 
-gradient = gradient / gradnorm
 
 
 
@@ -145,21 +136,44 @@ def lineloss(endpoints):
 
 outpixels = np.zeros((worksize,worksize)) + 255
 
-cutoff = 50
+cutoff = 10#Maximal number of lines
 
+pickedlines = np.zeros(cutoff)
+oldlines = np.copy(lines)
 for i in range(0,cutoff):
 
-    plt.quiver(range(0,worksize),range(0,worksize),gradient[:,:,1],gradient[:,:,0])
-    plt.show()
+    #plt.quiver(range(0,worksize),range(0,worksize),gradient[:,:,1],gradient[:,:,0])
+    #plt.show()
     losses = np.array(list(map(lineloss,lines)))
     minlineindex = np.argmin(losses)
+    pickedlines[i] = minlineindex
     minline = lines[minlineindex]
     minlinepixels = discrete_line(minline[0],minline[1])
     outpixels[minlinepixels[:,0],minlinepixels[:,1]] = 0
     adjustment = line_contribution(minline[0],minline[1])
-    gradient = np.minimum(gradient + adjustment,gradient - adjustment)
-    print(i)
+    #plt.quiver(range(0,worksize),range(0,worksize),adjustment[:,:,1],adjustment[:,:,0])
+    #plt.show()
+    oldgradient = gradient
 
+    conditions = np.argmin(np.array(np.linalg.norm(gradient,axis = -1),
+        np.linalg.norm(gradient+adjustment,axis = -1),
+        np.linalg.norm(gradient-adjustment,axis = -1)),axis=-1)
+
+    conditions = np.repeat(conditions[:, :, np.newaxis], 2, axis=2)
+
+    gradient = numpy.where(conditions,gradient,gradient+adjustment,gradient-adjustment)
+
+    #conditions = np.linalg.norm(gradient - adjustment,axis=-1)<np.linalg.norm(gradient,axis=-1)
+    #conditions = np.repeat(conditions[:, :, np.newaxis], 2, axis=2)
+    #gradient = np.where(conditions,gradient - adjustment,gradient)
+    #conditions = np.linalg.norm(gradient + adjustment,axis=-1)<np.linalg.norm(gradient,axis=-1)
+    #conditions = np.repeat(conditions[:, :, np.newaxis], 2, axis=2)
+    #gradient = np.where(conditions,gradient + adjustment,gradient)
+    #print(np.all(oldgradient==gradient))
+    #print('---')
+    #print(lines.shape)
+    #lines = np.delete(lines,minlineindex,axis = 0)
+    #print(lines.shape)
 
 outimage = Image.fromarray(outpixels)
 outimage.show()

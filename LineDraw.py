@@ -6,8 +6,8 @@ import matplotlib.pyplot as plt
 import sys
 import itertools
 
-worksize =512
-numpoints = 128
+worksize =8
+numpoints = 4
 
 def perimeter_points(d,n,type = 'int'):
     """Returns n points evenly spaced along the perimeter of a circle of diameter d centered at the origin,
@@ -50,15 +50,7 @@ def coordinate_matrix(n):
     xcoordinates = np.zeros((n,n))
     xcoordinates = xcoordinates + np.arange(0,worksize) #broadcasting trick
     ycoordinates = xcoordinates.T
-    coordinates = np.array([ycoordinates,xcoordinates])
-
-
-
-
-
-
-
-
+    return np.array([ycoordinates,xcoordinates])
 
 
 def line_contribution(p1,p2):
@@ -71,25 +63,17 @@ def line_contribution(p1,p2):
     x2 = p2[0]
     y2 = p2[1]
 
-
-    dist_from_line = np.abs(np.dot(coordinates,np.array((-(x2-x1),y2-y1))) + x2*y1 - y2*x1)
-    dist_from_line = dist_from_line* (1.0/np.sqrt((y2-y1)**2+(x2-x1)**2))
-
+    coordinates = coordinate_matrix(worksize)
+    print(x2-x1)
+    numerator = np.sum(np.multiply(coordinates,np.reshape(np.array(((-(x2-x1),y2-y1))),(2,1,1))),axis = 0) + x2*y1 - y2*x1
+    dist_from_line = numerator * (1.0/np.sqrt((y2-y1)**2+(x2-x1)**2))
     xcontribution = (x2-x1)*(1/(10*dist_from_line+1))
     ycontribution = (y2-y1)*(1/(10*dist_from_line+1))
 
 
-    return np.swapaxes(np.swapaxes(np.array((xcontribution,ycontribution)),0,1),1,2)/np.sqrt((y2-y1)**2+(x2-x1)**2)
+    return np.array((xcontribution,ycontribution))/np.sqrt((y2-y1)**2+(x2-x1)**2)
 
 
-
-def sign(x):
-    if x>0:
-        return 1
-    elif x==0:
-        return 0
-    else :
-        return -1
 
 
 def discrete_line(p1,p2,alg = 'homebrew'):
@@ -103,7 +87,7 @@ def discrete_line(p1,p2,alg = 'homebrew'):
         xline = np.rint(np.linspace(p1[0],p2[0],numpixels)).astype(int)
         yline = np.rint(np.linspace(p1[1],p2[1],numpixels)).astype(int)
 
-        return np.array([xline,yline]).T
+        return np.array([xline,yline])
 
     elif alg == 'Bresenham':
         raise Exception
@@ -112,6 +96,11 @@ def discrete_line(p1,p2,alg = 'homebrew'):
 
 
 l = discrete_line((0,0),(5,3))
+
+rimpoints = perimeter_points(worksize,numpoints)
+pixels = get_image(r"C:\Users\bskau\github\LineDraw\VertLine.png",worksize)
+gradient = get_gradient(pixels)
+print(gradient.shape)
 
 lines = []
 for line in itertools.combinations(rimpoints,2):
@@ -123,16 +112,12 @@ def lineloss(endpoints):
     direction = endpoints[1]-endpoints[0]
     dperp = np.array((-direction[1],direction[0])) #Perpendicular vector to the direction
     dperp = dperp/np.linalg.norm(dperp)
-    lpoints = gradient[l[:,0],l[:,1]]
-
-    return -np.sum(np.abs(np.dot(lpoints,dperp)))
+    lpoints = gradient[:,l[0],l[1]]
 
 
+    return -np.sum(np.abs(np.dot(dperp,lpoints)))
 
-
-#lossendslines = list(map((lambda e : (lineloss(e),e,discrete_line(e[0],e[1]))),lines))
-
-
+print(lineloss(lines[0]))
 
 outpixels = np.zeros((worksize,worksize)) + 255
 
@@ -140,28 +125,19 @@ cutoff = 10#Maximal number of lines
 
 pickedlines = np.zeros(cutoff)
 oldlines = np.copy(lines)
+
+losses = np.array(list(map(lineloss,lines)))
+
+
 for i in range(0,cutoff):
 
-    #plt.quiver(range(0,worksize),range(0,worksize),gradient[:,:,1],gradient[:,:,0])
-    #plt.show()
-    losses = np.array(list(map(lineloss,lines)))
     minlineindex = np.argmin(losses)
     pickedlines[i] = minlineindex
     minline = lines[minlineindex]
     minlinepixels = discrete_line(minline[0],minline[1])
     outpixels[minlinepixels[:,0],minlinepixels[:,1]] = 0
     adjustment = line_contribution(minline[0],minline[1])
-    #plt.quiver(range(0,worksize),range(0,worksize),adjustment[:,:,1],adjustment[:,:,0])
-    #plt.show()
-    oldgradient = gradient
 
-    conditions = np.argmin(np.array(np.linalg.norm(gradient,axis = -1),
-        np.linalg.norm(gradient+adjustment,axis = -1),
-        np.linalg.norm(gradient-adjustment,axis = -1)),axis=-1)
-
-    conditions = np.repeat(conditions[:, :, np.newaxis], 2, axis=2)
-
-    gradient = numpy.where(conditions,gradient,gradient+adjustment,gradient-adjustment)
 
     #conditions = np.linalg.norm(gradient - adjustment,axis=-1)<np.linalg.norm(gradient,axis=-1)
     #conditions = np.repeat(conditions[:, :, np.newaxis], 2, axis=2)

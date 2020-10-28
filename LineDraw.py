@@ -6,8 +6,8 @@ import matplotlib.pyplot as plt
 import sys
 import itertools
 
-worksize =8
-numpoints = 4
+worksize = 32
+numpoints = 64
 
 def perimeter_points(d,n,type = 'int'):
     """Returns n points evenly spaced along the perimeter of a circle of diameter d centered at the origin,
@@ -20,7 +20,7 @@ def perimeter_points(d,n,type = 'int'):
         rimpoints = rimpoints.astype(int)
     return rimpoints
 
-print(perimeter_points(8,4))
+
 
 
 # Preprocessing of the image
@@ -37,13 +37,14 @@ def get_gradient(pixels,processing = 'normalize'):
     """returns the gradient of an image, and does basic preprocessing"""
     horgradient = ndimage.sobel(pixels, axis = 1)
     vergradient = ndimage.sobel(pixels, axis = 0)
-    return np.array((horgradient,vergradient))
+    gradient =  np.array((vergradient,horgradient))
 
     if processing == 'normalize':
         """Normalizing the  gradient"""
         gradnorm = 0.2*np.max(np.linalg.norm(gradient,axis = -1))
         gradient = gradient / gradnorm
 
+    return gradient
 
 def coordinate_matrix(n):
     """Making an array of coordinates"""
@@ -53,7 +54,7 @@ def coordinate_matrix(n):
     return np.array([ycoordinates,xcoordinates])
 
 
-def line_contribution(p1,p2):
+def line_contribution(p1,p2,alpha = 1):
     """Outputs the matrix with with to adjust the gradient after adding the line between p1 and p2"""
 
     adjust = np.zeros((worksize,worksize,2))
@@ -64,14 +65,13 @@ def line_contribution(p1,p2):
     y2 = p2[1]
 
     coordinates = coordinate_matrix(worksize)
-    print(x2-x1)
-    numerator = np.sum(np.multiply(coordinates,np.reshape(np.array(((-(x2-x1),y2-y1))),(2,1,1))),axis = 0) + x2*y1 - y2*x1
-    dist_from_line = numerator * (1.0/np.sqrt((y2-y1)**2+(x2-x1)**2))
-    xcontribution = (x2-x1)*(1/(10*dist_from_line+1))
-    ycontribution = (y2-y1)*(1/(10*dist_from_line+1))
+    numerator = np.sum(np.multiply(coordinates,np.reshape(np.array(((y2-y1,-(x2-x1)))),(2,1,1))),axis = 0) + x2*y1 - y2*x1
+    dist_from_line = np.abs(numerator) * (1.0/np.sqrt((y2-y1)**2+(x2-x1)**2))
+    xcontribution = (x2-x1)*(1/(alpha*dist_from_line+1))
+    ycontribution = (y2-y1)*(1/(alpha*dist_from_line+1))
 
 
-    return np.array((xcontribution,ycontribution))/np.sqrt((y2-y1)**2+(x2-x1)**2)
+    return np.array((ycontribution,xcontribution))/np.sqrt((y2-y1)**2+(x2-x1)**2)
 
 
 
@@ -94,19 +94,16 @@ def discrete_line(p1,p2,alg = 'homebrew'):
     elif alg == 'Wu':
         raise Exception
 
-
-l = discrete_line((0,0),(5,3))
-
 rimpoints = perimeter_points(worksize,numpoints)
-pixels = get_image(r"C:\Users\bskau\github\LineDraw\VertLine.png",worksize)
+pixels = get_image(r"C:\Users\bskau\github\LineDraw\Star.png",worksize)
 gradient = get_gradient(pixels)
-print(gradient.shape)
+
 
 lines = []
-for line in itertools.combinations(rimpoints,2):
+for line in itertools.combinations(rimpoints.T,2):
     lines.append(line)
 lines = np.array(lines)
-def lineloss(endpoints):
+def lineloss(endpoints,gradient):
     """Return the loss assigned to the line between the two points"""
     l = discrete_line(endpoints[0],endpoints[1])
     direction = endpoints[1]-endpoints[0]
@@ -117,77 +114,92 @@ def lineloss(endpoints):
 
     return -np.sum(np.abs(np.dot(dperp,lpoints)))
 
-print(lineloss(lines[0]))
+
+
+
 
 outpixels = np.zeros((worksize,worksize)) + 255
 
-cutoff = 10#Maximal number of lines
+cutoff = 5#Maximal number of lines
 
 pickedlines = np.zeros(cutoff)
 oldlines = np.copy(lines)
 
-losses = np.array(list(map(lineloss,lines)))
-
-
-for i in range(0,cutoff):
-
-    minlineindex = np.argmin(losses)
-    pickedlines[i] = minlineindex
-    minline = lines[minlineindex]
-    minlinepixels = discrete_line(minline[0],minline[1])
-    outpixels[minlinepixels[:,0],minlinepixels[:,1]] = 0
-    adjustment = line_contribution(minline[0],minline[1])
-
-
-    #conditions = np.linalg.norm(gradient - adjustment,axis=-1)<np.linalg.norm(gradient,axis=-1)
-    #conditions = np.repeat(conditions[:, :, np.newaxis], 2, axis=2)
-    #gradient = np.where(conditions,gradient - adjustment,gradient)
-    #conditions = np.linalg.norm(gradient + adjustment,axis=-1)<np.linalg.norm(gradient,axis=-1)
-    #conditions = np.repeat(conditions[:, :, np.newaxis], 2, axis=2)
-    #gradient = np.where(conditions,gradient + adjustment,gradient)
-    #print(np.all(oldgradient==gradient))
-    #print('---')
-    #print(lines.shape)
-    #lines = np.delete(lines,minlineindex,axis = 0)
-    #print(lines.shape)
-
-outimage = Image.fromarray(outpixels)
-outimage.show()
-
-
-sys.exit()
-
-threshold = np.min(losses)/2.3
-#print(losses<np.min(losses)/2)
-#print(np.min(losses))
-#print(lines.shape)
-drawlines = lines[losses <= threshold]
 
 
 
+def show_n_best_lines(lines,cutoff):
+    losses = np.array(list(map(lambda l : lineloss(l,gradient),lines)))
 
-#print(outpixels)
-for i in range(0,len(drawlines)):
-    currentline = discrete_line(drawlines[i][0],drawlines[i][1])
-    outpixels[currentline[:,0],currentline[:,1]] = 0
+    drawlinesindices = np.argpartition(losses,cutoff)[:cutoff]
 
-
-
-# for i in range(0,cutoff):
-#     currentline = lossendslines[i][2]
-#     outpixels[currentline[:,0],currentline[:,1]] = 0
-#     # if i > 0 and i % 50 == 0:
-#     #     print(i)
-#     #     command = input()
-#     #     if command == "exit":
-    #         break
+    for i in range(0,cutoff):
+        line = lines[drawlinesindices[i]]
+        linepixels = discrete_line(line[0],line[1])
+        outpixels[linepixels[0],linepixels[1]] = 0
 
 
-outimage = Image.fromarray(outpixels)
-outimage.show()
+    outimage = Image.fromarray(outpixels)
+    outimage.show()
+
+#show_n_best_lines(lines,cutoff)
 
 
+def clip_at_zero(M,N):
+    """M,N are two matrices of vectors, returns a matrix which is M if M,N have positive dot product, and 0 otherwise"""
+    dotprod = np.sum(np.multiply(M,N),axis = 0)
+    if (np.any(np.logical_and(dotprod <= 0, np.all(M == np.array((0,0)).reshape((2,1,1)), axis=0)))):
+        print('clipping happened')
+    return np.where(dotprod<=0,np.zeros_like(M),M)
+
+def iterate_n_best_lines(lines,n,plot = False):
+    gradient = get_gradient(pixels)
+    for i in range(0,n):
+        losses = np.array(list(map(lambda l : lineloss(l,gradient),lines)))
+        currentindex = np.argmin(losses)
+        print('Index of line:')
+        print(currentindex)
+        currentlineends = lines[currentindex]
+        currentline = discrete_line(currentlineends[0],currentlineends[1])
+        currentdirection = currentlineends[1]-currentlineends[0]
+        currentdirection = currentdirection/np.linalg.norm(currentdirection)
+        outpixels[currentline[0],currentline[1]] = 0
+
+        contribution =  1*line_contribution(currentlineends[0],currentlineends[1])
+
+        subtractgrad = gradient - contribution
+        addgrad = gradient + contribution
 
 
+        plt.show()
+        if plot:
+            fig, ((ax1, ax2), (ax3, ax4)) = plt.subplots(nrows = 2,ncols = 2)
+            ax1.quiver(gradient[1],gradient[0])
+            ax1.title.set_text('gradient')
+            ax2.quiver(contribution[1],contribution[0])
+            ax2.title.set_text('contribution')
+            ax3.quiver(addgrad[1],addgrad[0])
+            ax3.title.set_text('addgrad')
+            ax4.quiver(subtractgrad[1],subtractgrad[0])
+            ax4.title.set_text('subtractgrad')
 
-#outimage.save(r"C:\Users\bskau\github\LineDraw\LennaLine.png")
+        subtractgrad = clip_at_zero(subtractgrad,gradient)
+        addgrad = clip_at_zero(addgrad,gradient)
+
+        gradnorms = np.array((np.linalg.norm(gradient,axis = 0),np.linalg.norm(subtractgrad,axis = 0),np.linalg.norm(addgrad,axis = 0)))
+        #Only subtract if this lowers the norm of the vector
+        gradient = np.choose(np.argmin(gradnorms,axis = 0),(gradient,subtractgrad,addgrad))
+
+        outimage = Image.fromarray(outpixels)
+        print('max gradient')
+        maxgrad = np.max(np.linalg.norm(gradient,axis = 0))
+        print(np.max(np.linalg.norm(gradient,axis = 0)))
+        if maxgrad == 0:
+            print('exiting')
+            break
+        outimage.show()
+        print('Iteration number:')
+        print(i)
+
+
+iterate_n_best_lines(lines,3,plot = True)

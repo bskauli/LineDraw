@@ -6,9 +6,6 @@ import matplotlib.pyplot as plt
 import sys
 import itertools
 
-worksize = 32
-numpoints = 64
-
 def perimeter_points(d,n,type = 'int'):
     """Returns n points evenly spaced along the perimeter of a circle of diameter d centered at the origin,
        if type = 'int' the coordinates are rounded to the neares integer"""
@@ -19,9 +16,6 @@ def perimeter_points(d,n,type = 'int'):
         rimpoints = np.round(rimpoints)
         rimpoints = rimpoints.astype(int)
     return rimpoints
-
-
-
 
 # Preprocessing of the image
 def get_image(filepath,size):
@@ -71,10 +65,7 @@ def line_contribution(p1,p2,alpha = 1):
     ycontribution = (y2-y1)*(1/(alpha*dist_from_line+1))
 
 
-    return np.array((ycontribution,xcontribution))/np.sqrt((y2-y1)**2+(x2-x1)**2)
-
-
-
+    return np.array((-ycontribution,xcontribution))/np.sqrt((y2-y1)**2+(x2-x1)**2)
 
 def discrete_line(p1,p2,alg = 'homebrew'):
 
@@ -94,15 +85,7 @@ def discrete_line(p1,p2,alg = 'homebrew'):
     elif alg == 'Wu':
         raise Exception
 
-rimpoints = perimeter_points(worksize,numpoints)
-pixels = get_image(r"C:\Users\bskau\github\LineDraw\Star.png",worksize)
-gradient = get_gradient(pixels)
 
-
-lines = []
-for line in itertools.combinations(rimpoints.T,2):
-    lines.append(line)
-lines = np.array(lines)
 def lineloss(endpoints,gradient):
     """Return the loss assigned to the line between the two points"""
     l = discrete_line(endpoints[0],endpoints[1])
@@ -111,21 +94,7 @@ def lineloss(endpoints,gradient):
     dperp = dperp/np.linalg.norm(dperp)
     lpoints = gradient[:,l[0],l[1]]
 
-
     return -np.sum(np.abs(np.dot(dperp,lpoints)))
-
-
-
-
-
-outpixels = np.zeros((worksize,worksize)) + 255
-
-cutoff = 5#Maximal number of lines
-
-pickedlines = np.zeros(cutoff)
-oldlines = np.copy(lines)
-
-
 
 
 def show_n_best_lines(lines,cutoff):
@@ -141,8 +110,6 @@ def show_n_best_lines(lines,cutoff):
 
     outimage = Image.fromarray(outpixels)
     outimage.show()
-
-#show_n_best_lines(lines,cutoff)
 
 
 def clip_at_zero(M,N):
@@ -165,7 +132,7 @@ def iterate_n_best_lines(lines,n,plot = False):
         currentdirection = currentdirection/np.linalg.norm(currentdirection)
         outpixels[currentline[0],currentline[1]] = 0
 
-        contribution =  1*line_contribution(currentlineends[0],currentlineends[1])
+        contribution = 0.5*line_contribution(currentlineends[0],currentlineends[1])
 
         subtractgrad = gradient - contribution
         addgrad = gradient + contribution
@@ -197,9 +164,29 @@ def iterate_n_best_lines(lines,n,plot = False):
         if maxgrad == 0:
             print('exiting')
             break
-        outimage.show()
+        if i % 5 == 0 and i !=0:
+            outimage.show()
         print('Iteration number:')
         print(i)
+    outimage.show()
+
+worksize = 512
+numpoints = 128
+
+rimpoints = perimeter_points(worksize,numpoints)
+pixels = get_image(r"C:\Users\bskau\github\LineDraw\Clover.png",worksize)
+gradient = get_gradient(pixels)
 
 
-iterate_n_best_lines(lines,3,plot = True)
+lines = []
+for line in itertools.combinations(rimpoints.T,2):
+    lines.append(line)
+lines = np.array(lines)
+
+outpixels = np.zeros((worksize,worksize)) + 255
+cutoff = 5#Maximal number of lines
+pickedlines = np.zeros(cutoff)
+oldlines = np.copy(lines)
+
+
+iterate_n_best_lines(lines,50,plot = False)
